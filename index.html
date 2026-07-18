@@ -69,6 +69,11 @@
   .stage-head h2{margin:0;font-size:26px;}
   .stage-head .lvl{font-size:13px;font-weight:800;color:var(--night);background:var(--cream);
     padding:3px 12px;border-radius:999px;letter-spacing:1px;}
+  .stage-head .trophy{margin-left:auto;font-size:15px;font-weight:800;color:var(--night);
+    background:linear-gradient(180deg,#ffe089,var(--sun));padding:4px 12px 4px 9px;border-radius:999px;
+    letter-spacing:.5px;box-shadow:0 3px 0 #a97f00,0 0 14px rgba(255,206,69,.55);
+    align-self:center;animation:trophypop .5s cubic-bezier(.2,1.6,.4,1);}
+  @keyframes trophypop{from{transform:scale(0) rotate(-30deg);}to{transform:scale(1) rotate(0);}}
   .lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
   .lesson-card{
     background:var(--card);border-radius:var(--radius);padding:16px 16px 14px;text-align:left;
@@ -83,6 +88,9 @@
   .stars .on{color:var(--sun);text-shadow:0 0 8px rgba(255,206,69,.7);}
   .lesson-card.locked{opacity:.55;cursor:not-allowed;}
   .lesson-card .lock{position:absolute;top:12px;right:14px;font-size:18px;}
+  .lesson-card .best{position:absolute;top:11px;right:12px;font-size:11px;font-weight:800;
+    background:var(--night-deep);color:var(--sun);padding:3px 9px;border-radius:999px;letter-spacing:.5px;
+    box-shadow:0 2px 6px rgba(0,0,0,.35);}
   .parents{margin-top:34px;background:var(--card);border-radius:var(--radius);padding:18px 20px;font-size:15px;color:var(--cream-dim);line-height:1.6;}
   .parents b{color:var(--cream);}
 
@@ -653,8 +661,7 @@ const CEL_COPY={
   7:['🌟','7-Day Streak!','A whole week of drumming!'],
   14:['🏆','14-Day Streak!','Two weeks — you’re a real Drum Star!'],
 };
-function celebrate(milestone){
-  const [emoji,title,sub]=CEL_COPY[milestone]||['🔥',milestone+'-Day Streak!','Keep it up!'];
+function showCelebration(emoji,title,sub){
   const el=$('#celebrate');
   el.querySelector('.cel-emoji').textContent=emoji;
   el.querySelector('.cel-title').textContent=title;
@@ -662,6 +669,19 @@ function celebrate(milestone){
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   try{ celebrateSound(); }catch(e){}
   clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600);
+}
+function celebrate(milestone){
+  const [emoji,title,sub]=CEL_COPY[milestone]||['🔥',milestone+'-Day Streak!','Keep it up!'];
+  showCelebration(emoji,title,sub);
+}
+function stageOf(lessonId){ return STAGES.find(s=>s.lessons.some(l=>l.id===lessonId)); }
+// True if every lesson in `stage` is 3-starred, optionally overriding one
+// lesson's star count (used to compare "before vs after" a result).
+function stageAllThree(stage, overrideId, overrideStars){
+  return stage.lessons.every(l=>{
+    const st = (l.id===overrideId) ? overrideStars : (progress[l.id]?.stars||0);
+    return st===3;
+  });
 }
 function noteToday(){ const ms=markPracticeToday(); if(ms) setTimeout(()=>celebrate(ms),450); }
 function isUnlocked(idx){
@@ -695,12 +715,16 @@ function renderHome(){
   let idx=0;
   STAGES.forEach(stage=>{
     const s=document.createElement('div'); s.className='stage';
-    s.innerHTML=`<div class="stage-head"><h2>${stage.name}</h2><span class="lvl">${stage.lvl}</span></div>`;
+    const allThree = stage.lessons.every(l=>(progress[l.id]?.stars||0)===3);
+    const trophy = allThree ? `<span class="trophy" title="Every lesson 3-starred!">🏆 All 3★</span>` : '';
+    s.innerHTML=`<div class="stage-head"><h2>${stage.name}</h2><span class="lvl">${stage.lvl}</span>${trophy}</div>`;
     const grid=document.createElement('div'); grid.className='lessons';
     stage.lessons.forEach(les=>{
       const i = idx++;
       const unlocked = isUnlocked(i);
       const stars = progress[les.id]?.stars||0;
+      const best = progress[les.id]?.best||0;
+      const corner = unlocked ? (best>0?`<div class="best">Best ${best}%</div>`:'') : '<div class="lock">🔒</div>';
       const card=document.createElement('button');
       card.className='lesson-card'+(unlocked?'':' locked');
       card.innerHTML=`
@@ -708,7 +732,7 @@ function renderHome(){
         <div class="name">${les.name}</div>
         <div class="meta">${les.bpm} bpm · ${les.notes.length} hits</div>
         <div class="stars">${[1,2,3].map(k=>`<span class="${k<=stars?'on':''}">★</span>`).join('')}</div>
-        ${unlocked?'':'<div class="lock">🔒</div>'}`;
+        ${corner}`;
       if(unlocked) card.onclick=()=>startLesson(i);
       else card.disabled=true;
       grid.appendChild(card);
@@ -959,6 +983,12 @@ async function finishLesson(){
   const prev=progress[G.les.id]||{stars:0,best:0};
   progress[G.les.id]={stars:Math.max(prev.stars,stars),best:Math.max(prev.best,pct)};
   await saveProgress();
+
+  // Did this result just 3-star the whole stage for the first time?
+  const stage=stageOf(G.les.id);
+  if(stage && stageAllThree(stage) && !stageAllThree(stage, G.les.id, prev.stars)){
+    setTimeout(()=>showCelebration('🏆','Stage Complete!',`You 3-starred every lesson in ${stage.name}!`), 900);
+  }
 
   $('#resTitle').textContent = stars===3?'SUPERSTAR! 🌟':stars===2?'Awesome!':stars===1?'You did it!':'Almost there!';
   $('#resLesson').textContent = G.les.name;
