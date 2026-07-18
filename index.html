@@ -179,6 +179,40 @@
   .player-chip .switch{background:var(--card-hi);color:var(--cream);border-radius:999px;
     padding:7px 15px;font-size:14px;font-weight:800;box-shadow:0 3px 0 #170d3d;}
 
+  /* ---------- STREAK ---------- */
+  .streak-card{display:flex;align-items:center;gap:16px;justify-content:center;
+    background:var(--card);border-radius:var(--radius);padding:14px 20px;max-width:520px;
+    margin:0 auto 26px;box-shadow:0 6px 0 rgba(0,0,0,.3);}
+  .streak-card .flame{display:flex;align-items:center;gap:6px;font-size:38px;line-height:1;
+    filter:grayscale(1) opacity(.55);}
+  .streak-card .flame.lit{filter:none;}
+  .streak-card .flame .num{font-family:'Baloo 2';font-size:34px;font-weight:800;color:var(--sun);}
+  .streak-card .stk-mid{flex:1;min-width:0;}
+  .streak-card .stk-label{font-family:'Baloo 2';font-weight:700;font-size:16px;color:var(--cream);margin-bottom:7px;}
+  .streak-card .week{display:flex;gap:7px;}
+  .streak-card .dot{width:16px;height:16px;border-radius:50%;background:var(--card-hi);}
+  .streak-card .dot.on{background:var(--sun);box-shadow:0 0 8px rgba(255,206,69,.6);}
+  .streak-card .dot.today{outline:2px solid var(--cream);outline-offset:2px;}
+  .streak-card .stk-best{text-align:center;font-size:12px;font-weight:800;color:var(--cream-dim);line-height:1.2;}
+  .streak-card .stk-best b{display:block;font-family:'Baloo 2';font-size:22px;color:var(--cream);}
+  @media (max-width:520px){.streak-card{gap:11px;padding:12px 14px;}.streak-card .dot{width:13px;height:13px;}
+    .streak-card .flame{font-size:32px;}.streak-card .flame .num{font-size:28px;}}
+
+  /* ---------- CELEBRATION TOAST ---------- */
+  #celebrate{position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:center;
+    pointer-events:none;z-index:40;opacity:0;padding:0 16px;}
+  #celebrate.show{animation:celshow 2.6s ease forwards;}
+  @keyframes celshow{0%{opacity:0;}8%{opacity:1;}85%{opacity:1;}100%{opacity:0;}}
+  #celebrate .cel-inner{margin-top:13vh;background:linear-gradient(180deg,#37257A,#2A1B5E);
+    border:3px solid var(--sun);border-radius:26px;padding:22px 34px;text-align:center;
+    box-shadow:0 16px 50px rgba(0,0,0,.6);transform:scale(.5);}
+  #celebrate.show .cel-inner{animation:celpop .6s cubic-bezier(.2,1.6,.4,1) forwards;}
+  @keyframes celpop{to{transform:scale(1);}}
+  #celebrate .cel-emoji{font-size:66px;line-height:1;animation:celwobble 1s ease-in-out infinite;}
+  @keyframes celwobble{0%,100%{transform:rotate(-8deg);}50%{transform:rotate(8deg);}}
+  #celebrate .cel-title{font-family:'Baloo 2';font-size:32px;font-weight:800;color:var(--sun);margin-top:6px;}
+  #celebrate .cel-sub{font-weight:700;color:var(--cream);font-size:17px;margin-top:2px;}
+
   /* ---------- RESULTS ---------- */
   #results{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
@@ -215,6 +249,7 @@
     <div class="player-bar" id="playerBar"></div>
     <div class="logo-row"><div class="logo-badge">🥁</div><h1 class="title">Drum Star</h1></div>
     <p class="tagline">Hit the falling gems right on the beat and become a drum star!</p>
+    <div class="streak-card" id="streakCard"></div>
     <div class="top-actions">
       <button class="btn" id="btnContinue">▶ Play next lesson</button>
       <button class="btn ghost" id="btnFreeplay">🎶 Free play</button>
@@ -278,6 +313,15 @@
     <div id="countin"></div>
   </div>
   <div class="pads" id="padRow"></div>
+</div>
+
+<!-- ============ STREAK CELEBRATION ============ -->
+<div id="celebrate">
+  <div class="cel-inner">
+    <div class="cel-emoji">🔥</div>
+    <div class="cel-title"></div>
+    <div class="cel-sub"></div>
+  </div>
 </div>
 
 <!-- ============ RESULTS ============ -->
@@ -354,6 +398,13 @@ function playClick(accent){const c=audio();const t=c.currentTime;
   const o=c.createOscillator(),g=c.createGain();o.frequency.value=accent?1500:1000;
   g.gain.setValueAtTime(accent?.5:.3,t);g.gain.exponentialRampToValueAtTime(.001,t+.05);
   o.connect(g).connect(c.destination);o.start(t);o.stop(t+.06);}
+/* Happy ascending arpeggio for streak celebrations */
+function celebrateSound(){const c=audio();const t=c.currentTime;
+  [0,4,7,12,16].forEach((semi,i)=>{const f=523.25*Math.pow(2,semi/12);
+    const o=c.createOscillator(),g=c.createGain();o.type='triangle';o.frequency.value=f;
+    const st=t+i*0.1;g.gain.setValueAtTime(.0001,st);g.gain.exponentialRampToValueAtTime(.4,st+.02);
+    g.gain.exponentialRampToValueAtTime(.0001,st+.32);
+    o.connect(g).connect(c.destination);o.start(st);o.stop(st+.34);});}
 
 /* =============== PADS =============== */
 const PADS = {
@@ -464,6 +515,70 @@ function saveProgress(){
   try{ localStorage.setItem(progKey(p.id), JSON.stringify(progress)); }
   catch(e){}
 }
+
+/* =============== DAILY PRACTICE STREAK (per active player) =============== */
+const MILESTONES=[3,7,14];
+function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function todayStr(){ return ymd(new Date()); }
+function shiftDay(dateStr,n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return ymd(d); }
+function streakKey(id){ return 'drumstar-streak-'+id; }
+function loadStreak(){
+  const p=activePlayer(); if(!p) return {last:'',current:0,best:0,days:[]};
+  try{ const r=localStorage.getItem(streakKey(p.id)); if(r){ const s=JSON.parse(r); s.days=s.days||[]; return s; } }catch(e){}
+  return {last:'',current:0,best:0,days:[]};
+}
+function saveStreak(s){ const p=activePlayer(); if(!p) return;
+  try{ localStorage.setItem(streakKey(p.id), JSON.stringify(s)); }catch(e){} }
+// Records "played today". Returns a milestone number (3/7/14) if one was
+// newly reached today, else 0. Only counts once per calendar day.
+function markPracticeToday(){
+  const p=activePlayer(); if(!p) return 0;
+  const s=loadStreak(); const today=todayStr();
+  if(s.last===today) return 0;                     // already practiced today
+  s.current = (s.last===shiftDay(today,-1)) ? (s.current||0)+1 : 1;  // continue or restart
+  s.last=today;
+  s.best=Math.max(s.best||0, s.current);
+  s.days=(s.days||[]).filter(d=>d>shiftDay(today,-14)); s.days.push(today);
+  saveStreak(s);
+  return MILESTONES.includes(s.current) ? s.current : 0;
+}
+// Streak to show on the home screen. A streak only "counts" if the last play
+// was today or yesterday; otherwise it's broken and shows 0.
+function displayStreak(){
+  const s=loadStreak(); const today=todayStr();
+  let cur=s.current||0;
+  if(s.last!==today && s.last!==shiftDay(today,-1)) cur=0;
+  return {cur, best:s.best||0, days:new Set(s.days||[])};
+}
+function renderStreak(){
+  const el=$('#streakCard'); if(!el) return;
+  const d=displayStreak(), today=todayStr();
+  let dots='';
+  for(let i=6;i>=0;i--){ const day=shiftDay(today,-i);
+    dots+=`<span class="dot${d.days.has(day)?' on':''}${day===today?' today':''}"></span>`; }
+  const lit=d.cur>0;
+  const label = d.cur>0 ? `${d.cur}-day streak — keep it going!` : 'Play today to start a streak!';
+  el.innerHTML =
+    `<div class="flame ${lit?'lit':''}">${lit?'🔥':'🌱'}<span class="num">${d.cur}</span></div>`+
+    `<div class="stk-mid"><div class="stk-label">${label}</div><div class="week">${dots}</div></div>`+
+    `<div class="stk-best">Best<b>${d.best}</b></div>`;
+}
+const CEL_COPY={
+  3:['🔥','3-Day Streak!','Three days in a row — awesome!'],
+  7:['🌟','7-Day Streak!','A whole week of drumming!'],
+  14:['🏆','14-Day Streak!','Two weeks — you’re a real Drum Star!'],
+};
+function celebrate(milestone){
+  const [emoji,title,sub]=CEL_COPY[milestone]||['🔥',milestone+'-Day Streak!','Keep it up!'];
+  const el=$('#celebrate');
+  el.querySelector('.cel-emoji').textContent=emoji;
+  el.querySelector('.cel-title').textContent=title;
+  el.querySelector('.cel-sub').textContent=sub;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  try{ celebrateSound(); }catch(e){}
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600);
+}
+function noteToday(){ const ms=markPracticeToday(); if(ms) setTimeout(()=>celebrate(ms),450); }
 function isUnlocked(idx){
   if(idx===0) return true;
   const prev = ALL_LESSONS[idx-1];
@@ -490,6 +605,7 @@ function renderPlayerBar(){
 }
 function renderHome(){
   renderPlayerBar();
+  renderStreak();
   const wrap = $('#stageList'); wrap.innerHTML='';
   let idx=0;
   STAGES.forEach(stage=>{
@@ -601,6 +717,7 @@ function startLesson(i){
   $('#score').textContent='—'; $('#streak').textContent='';
   showScreen('game'); resizeCanvas();
   unlockAudio();
+  noteToday();
   const c=audio();
   Promise.resolve(c.resume()).catch(()=>{}).then(()=>{
     G.startAt=c.currentTime + G.countBeats*spb + 0.2;
@@ -613,7 +730,7 @@ function startFreeplay(){
   G={freeplay:true, running:true, particles:[], lanePads:['hihat','snare','kick','tom','crash']};
   $('#lessonName').textContent='Free Play — jam on anything!';
   $('#score').textContent='🎶'; $('#streak').textContent='';
-  showScreen('game'); resizeCanvas(); requestAnimationFrame(loop);
+  showScreen('game'); resizeCanvas(); noteToday(); requestAnimationFrame(loop);
 }
 
 function padHit(id){
