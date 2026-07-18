@@ -40,7 +40,9 @@
   .screen.active{display:block;}
 
   /* ---------- HOME ---------- */
-  .home-wrap{max-width:860px;margin:0 auto;padding:28px 20px 60px;}
+  .home-wrap{max-width:860px;margin:0 auto;
+    padding:calc(28px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+            60px calc(20px + env(safe-area-inset-left));}
   .logo-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:4px;}
   .logo-badge{
     width:64px;height:64px;border-radius:50%;
@@ -97,7 +99,9 @@
   /* ---------- GAME ---------- */
   #game{display:none;flex-direction:column;height:100vh;height:100dvh;}
   #game.active{display:flex;}
-  .game-top{display:flex;align-items:center;gap:12px;padding:12px 16px;}
+  .game-top{display:flex;align-items:center;gap:12px;
+    padding:calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+            12px calc(16px + env(safe-area-inset-left));}
   .game-top .back{background:var(--card-hi);color:var(--cream);border-radius:14px;padding:8px 16px;font-size:16px;font-weight:700;box-shadow:0 3px 0 #170d3d;}
   .game-top .lname{font-family:'Baloo 2';font-size:20px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .hud{display:flex;gap:14px;align-items:center;font-weight:800;}
@@ -123,7 +127,9 @@
     font-family:'Baloo 2';font-size:120px;font-weight:800;color:var(--cream);
     text-shadow:0 8px 0 rgba(0,0,0,.35);z-index:5;
   }
-  .pads{display:flex;justify-content:center;gap:14px;padding:10px 12px calc(18px + env(safe-area-inset-bottom));}
+  .pads{display:flex;justify-content:center;gap:14px;
+    padding:10px calc(12px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom))
+            calc(12px + env(safe-area-inset-left));}
   .padbtn{
     --pc:var(--sun);
     width:104px;height:104px;border-radius:50%;position:relative;user-select:none;
@@ -140,7 +146,9 @@
   @media (max-width:620px){.padbtn{width:74px;height:74px;}.padbtn .pname{font-size:12px;}}
 
   /* ---------- PROFILES ---------- */
-  .pf-wrap{max-width:760px;margin:0 auto;padding:34px 20px 60px;text-align:center;}
+  .pf-wrap{max-width:760px;margin:0 auto;text-align:center;
+    padding:calc(34px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+            60px calc(20px + env(safe-area-inset-left));}
   .pf-wrap h1.pf-title{font-size:clamp(28px,6vw,44px);margin:10px 0 4px;color:var(--sun);
     text-shadow:0 3px 0 rgba(0,0,0,.25);}
   .pf-wrap p.sub{color:var(--cream-dim);font-weight:700;font-size:18px;margin:0 0 24px;}
@@ -273,8 +281,8 @@
       Play by tapping the pads or with keyboard keys <b>D&nbsp;F&nbsp;J&nbsp;K&nbsp;L</b> (left hand on D–F, right hand on J–K–L).
       <b>Practice mode</b> slows every lesson down — great for the first try. Progress is saved automatically.
       Each drummer has their <b>own name, avatar and stars</b> — tap <b>Switch</b> at the top to change players or add a sibling.
-      <br><b>No sound?</b> Tap “Sound check” once (browsers block audio until the first tap). On an iPhone or iPad,
-      also flip the side <b>mute switch off</b> and turn the volume up — Web Audio follows the ringer switch.
+      <br><b>No sound?</b> Tap “Sound check” once (browsers block audio until the first tap) and turn the volume up.
+      Drum Star now plays even with the iPad’s side <b>mute switch on</b>; on much older iPads, flip that switch off too.
       <br><b>iPad tip:</b> in Safari tap <b>Share → Add to Home Screen</b> to install Drum Star as a full-screen app.
     </div>
   </div>
@@ -353,7 +361,18 @@
 <script>
 /* =============== DRUM SOUNDS (Web Audio) =============== */
 let AC = null, audioReady = false;
-function audio(){ if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function audio(){
+  if(!AC){
+    const Ctx = window.AudioContext||window.webkitAudioContext;
+    try{ AC = new Ctx({latencyHint:'interactive'}); }catch(e){ AC = new Ctx(); }
+    // iOS 16.4+: play through the hardware silent/mute switch instead of being
+    // muted by it (this app is playback-only). Without this the whole app can
+    // seem silent on an iPad with the side switch flipped to mute.
+    try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+  }
+  if(AC.state==='suspended') AC.resume();
+  return AC;
+}
 /* Browsers block audio until a user gesture. Unlock on the very first
    tap/click/keypress: play a silent buffer (wakes iOS Safari) + resume(). */
 function unlockAudio(){
