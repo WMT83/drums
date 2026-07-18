@@ -406,6 +406,69 @@ function celebrateSound(){const c=audio();const t=c.currentTime;
     g.gain.exponentialRampToValueAtTime(.0001,st+.32);
     o.connect(g).connect(c.destination);o.start(st);o.stop(st+.34);});}
 
+/* =============== BACKING TRACK (bass + chord pad for Song Star) =============== */
+const NOTE_MIDI={C:0,'C#':1,D:2,'D#':3,E:4,F:5,'F#':6,G:7,'G#':8,A:9,'A#':10,B:11};
+const CHORD_INT={maj:[0,4,7],min:[0,3,7],sus4:[0,5,7],dom7:[0,4,7,10],min7:[0,3,7,10]};
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+let BACKING=null; // {bus, nodes:[]}
+function stopBacking(){
+  if(!BACKING) return;
+  const b=BACKING; BACKING=null;
+  try{
+    const c=audio(), t=c.currentTime;
+    if(b.bus){ b.bus.gain.cancelScheduledValues(t);
+      b.bus.gain.setValueAtTime(Math.max(b.bus.gain.value,0.0001),t);
+      b.bus.gain.exponentialRampToValueAtTime(0.0001,t+0.1); }
+    b.nodes.forEach(o=>{ try{o.stop(t+0.12);}catch(e){} });
+  }catch(e){}
+}
+function schedBass(startT,dur,midi){
+  const c=audio(), o=c.createOscillator(), g=c.createGain();
+  o.type='triangle'; o.frequency.value=mtof(midi);
+  g.gain.setValueAtTime(0.0001,startT);
+  g.gain.exponentialRampToValueAtTime(0.5,startT+0.02);
+  g.gain.exponentialRampToValueAtTime(0.08,startT+dur*0.7);
+  g.gain.exponentialRampToValueAtTime(0.0001,startT+dur);
+  o.connect(g).connect(BACKING.bus); o.start(startT); o.stop(startT+dur+0.05);
+  BACKING.nodes.push(o);
+}
+function schedChord(startT,dur,midis){
+  const c=audio();
+  midis.forEach(m=>{ const o=c.createOscillator(), g=c.createGain();
+    o.type='sine'; o.frequency.value=mtof(m);
+    g.gain.setValueAtTime(0.0001,startT);
+    g.gain.linearRampToValueAtTime(0.09,startT+0.1);              // soft swell in
+    g.gain.setValueAtTime(0.09,startT+Math.max(0.12,dur-0.14));
+    g.gain.exponentialRampToValueAtTime(0.0001,startT+dur);        // fade before next chord
+    o.connect(g).connect(BACKING.bus); o.start(startT); o.stop(startT+dur+0.05);
+    BACKING.nodes.push(o);
+  });
+}
+// Schedules the whole backing track up-front on the AudioContext clock, in sync
+// with the notes (both start at G.startAt). Rock-solid timing, no per-frame work.
+function scheduleBacking(G){
+  const back=G.les.backing; if(!back) return;
+  const c=audio();
+  const bus=c.createGain(); bus.gain.value=0.6;
+  const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600; // warm, sits under drums
+  bus.connect(lp).connect(c.destination);
+  BACKING={bus, nodes:[]};
+  const spb=G.spb, base=G.startAt, loops=back.loops||1;
+  let beat=0;
+  for(let L=0;L<loops;L++){
+    for(const ch of back.chords){
+      const startT=base+beat*spb, dur=ch.beats*spb;
+      const triad=(CHORD_INT[ch.type]||CHORD_INT.maj).map(i=>12*4+NOTE_MIDI[ch.root]+i); // pad, octave 4
+      schedChord(startT,dur,triad);
+      const rootBase=12*2+NOTE_MIDI[ch.root]; // bass, octave 2
+      for(let bt=0;bt<ch.beats;bt++){
+        schedBass(startT+bt*spb, spb*0.95, rootBase+((bt%2)?7:0)); // root / fifth bounce
+      }
+      beat+=ch.beats;
+    }
+  }
+}
+
 /* =============== PADS =============== */
 const PADS = {
   hihat:{name:'Hi-Hat', key:'D', color:'#3EE0D3', play:playHihat},
@@ -421,6 +484,9 @@ const KEYMAP = {d:'hihat', f:'snare', j:'kick', k:'tom', l:'crash'};
 const n=(b,p)=>({b,p});
 const bar=(arr,offset)=>arr.map(x=>n(x.b+offset,x.p));
 function repeatBars(pattern, bars){let out=[];for(let i=0;i<bars;i++)out=out.concat(bar(pattern,i*4));return out;}
+// barsAt(pattern, startBar, count) — drop `count` copies of a 1-bar pattern
+// starting at bar `startBar` (each bar = 4 beats). Lets a song change feel mid-way.
+function barsAt(pattern, startBar, count){let out=[];for(let i=0;i<count;i++)out=out.concat(bar(pattern,(startBar+i)*4));return out;}
 
 const rockQuarter = [n(0,'hihat'),n(0,'kick'),n(1,'hihat'),n(1,'snare'),n(2,'hihat'),n(2,'kick'),n(3,'hihat'),n(3,'snare')];
 const rockEighth = [n(0,'hihat'),n(0,'kick'),n(.5,'hihat'),n(1,'hihat'),n(1,'snare'),n(1.5,'hihat'),
@@ -467,6 +533,25 @@ const STAGES = [
       notes:repeatBars(funkKick,3)},
     {id:'l15', name:'Grand Finale', bpm:115, pads:['hihat','snare','kick','tom','crash'],
       notes:[...rockEighth, ...bar(rockEighth,4), ...bar(fillBar,8), n(12,'crash'), n(12,'kick')]},
+  ]},
+  {name:'Song Star', lvl:'SONGS', lessons:[
+    // Longer, song-length lessons that play over a synthesized bass + chord
+    // backing track (see scheduleBacking). Each chord is one bar (4 beats).
+    {id:'l16', name:'Sunshine Groove', bpm:80, pads:['hihat','snare','kick'],
+      notes:[...barsAt(rockQuarter,0,4), ...barsAt(rockEighth,4,4)],
+      backing:{loops:2, chords:[{root:'C',type:'maj',beats:4},{root:'G',type:'maj',beats:4},
+        {root:'A',type:'min',beats:4},{root:'F',type:'maj',beats:4}]}},
+    {id:'l17', name:'Rocket Rock', bpm:92, pads:['hihat','snare','kick','tom','crash'],
+      notes:[n(0,'crash'), ...barsAt(rockEighth,0,3), ...bar(fillBar,12),
+             ...barsAt(rockEighth,4,3), ...bar(fillBar,28), n(32,'crash')],
+      backing:{loops:2, chords:[{root:'A',type:'min',beats:4},{root:'F',type:'maj',beats:4},
+        {root:'C',type:'maj',beats:4},{root:'G',type:'maj',beats:4}]}},
+    {id:'l18', name:'Drum Star Anthem', bpm:100, pads:['hihat','snare','kick','tom','crash'],
+      notes:[n(0,'crash'), ...barsAt(rockEighth,0,3), ...bar(fillBar,12),
+             ...barsAt(funkKick,4,3), ...bar(fillBar,28),
+             ...barsAt(rockEighth,8,3), ...bar(fillBar,44), n(48,'crash'), n(48,'kick')],
+      backing:{loops:3, chords:[{root:'C',type:'maj',beats:4},{root:'G',type:'maj',beats:4},
+        {root:'A',type:'min',beats:4},{root:'F',type:'maj',beats:4}]}},
   ]},
 ];
 const ALL_LESSONS = STAGES.flatMap(s=>s.lessons);
@@ -709,7 +794,7 @@ function startLesson(i){
   const beats=Math.ceil((lastT+0.01)/spb)+1;
 
   G={ idx:i, les, bpm, spb, lanePads, notes,
-      startAt:0, countBeats:4, endT:lastT+1.2,
+      startAt:0, countBeats:4, endT:lastT+1.2, hasBacking:!!les.backing,
       perfect:0, good:0, miss:0, streak:0, maxStreak:0,
       lastClickBeat:-1, particles:[], running:true, freeplay:false };
 
@@ -721,6 +806,7 @@ function startLesson(i){
   const c=audio();
   Promise.resolve(c.resume()).catch(()=>{}).then(()=>{
     G.startAt=c.currentTime + G.countBeats*spb + 0.2;
+    scheduleBacking(G);
     requestAnimationFrame(loop);
   });
 }
@@ -823,7 +909,12 @@ function loop(ts){
     } else {
       ci.style.display='none';
       const beat=Math.floor(t/G.spb)+100; // offset so it never collides with count-in beats
-      if(beat!==G.lastClickBeat && t<G.endT-0.8){playClick(((beat-100)%4)===0);G.lastClickBeat=beat;}
+      const isDown=((beat-100)%4)===0;
+      if(beat!==G.lastClickBeat && t<G.endT-0.8){
+        // with a backing track, only tick the downbeat so the click doesn't fight the music
+        if(!G.hasBacking || isDown) playClick(isDown);
+        G.lastClickBeat=beat;
+      }
     }
     // notes
     for(const nt of G.notes){
@@ -883,6 +974,7 @@ async function finishLesson(){
 
 /* =============== SCREENS + INPUT =============== */
 function showScreen(id){
+  stopBacking();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   $('#'+id).classList.add('active');
   $('#results').classList.remove('active');
