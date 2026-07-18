@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Drum Star">
+<meta name="theme-color" content="#1B1140">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<title>Drum Star — Learn Drums!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#1B1140; --night-deep:#120B2E; --card:#2A1B5E; --card-hi:#37257A;
+    --cream:#FFF4E4; --cream-dim:#C9BDE8;
+    --sun:#FFCE45;
+    --kick:#FF5D73; --snare:#FFCE45; --hihat:#3EE0D3; --tom:#A98BFF; --crash:#FF9A3E;
+    --good:#7BE382;
+    --radius:22px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%; overscroll-behavior:none;}
+  #game, .pads, .padbtn, #laneWrap{touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #33206e 0%, var(--night) 55%, var(--night-deep) 100%);
+    color:var(--cream);
+    font-family:'Nunito',system-ui,sans-serif;
+    overflow-x:hidden;
+    min-height:100%;
+  }
+  h1,h2,h3,.display{font-family:'Baloo 2',cursive; letter-spacing:.5px;}
+  button{font-family:'Baloo 2',cursive; cursor:pointer; border:none;}
+  button:focus-visible, .padbtn:focus-visible{outline:3px solid var(--sun); outline-offset:3px;}
+  .screen{display:none; min-height:100vh;}
+  .screen.active{display:block;}
+
+  /* ---------- HOME ---------- */
+  .home-wrap{max-width:860px;margin:0 auto;padding:28px 20px 60px;}
+  .logo-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:4px;}
+  .logo-badge{
+    width:64px;height:64px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffe9a8, var(--sun) 60%, #d9a512);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 0 #8a6400, 0 12px 24px rgba(0,0,0,.4);
+    font-size:34px; transform:rotate(-6deg);
+  }
+  h1.title{font-size:clamp(38px,7vw,58px);margin:0;text-align:center;font-weight:800;
+    background:linear-gradient(180deg,#fff 20%, var(--sun));-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 4px 0 rgba(0,0,0,.25);}
+  .tagline{text-align:center;color:var(--cream-dim);margin:4px 0 22px;font-size:18px;font-weight:600;}
+  .top-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:30px;}
+  .btn{
+    padding:14px 26px;border-radius:999px;font-size:19px;font-weight:800;color:#241305;
+    background:linear-gradient(180deg,#ffe089,var(--sun));
+    box-shadow:0 5px 0 #a97f00, 0 10px 18px rgba(0,0,0,.35);
+    transition:transform .08s ease;
+  }
+  .btn:active{transform:translateY(4px);box-shadow:0 1px 0 #a97f00;}
+  .btn.ghost{background:var(--card-hi);color:var(--cream);box-shadow:0 5px 0 #170d3d,0 10px 18px rgba(0,0,0,.35);}
+  .btn:disabled{filter:grayscale(.8) brightness(.7);cursor:not-allowed;}
+
+  .stage{margin-bottom:26px;}
+  .stage-head{display:flex;align-items:baseline;gap:12px;margin:0 4px 10px;}
+  .stage-head h2{margin:0;font-size:26px;}
+  .stage-head .lvl{font-size:13px;font-weight:800;color:var(--night);background:var(--cream);
+    padding:3px 12px;border-radius:999px;letter-spacing:1px;}
+  .lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;}
+  .lesson-card{
+    background:var(--card);border-radius:var(--radius);padding:16px 16px 14px;text-align:left;
+    color:var(--cream);position:relative;border:2px solid transparent;
+    box-shadow:0 6px 0 rgba(0,0,0,.3);transition:transform .1s ease;
+  }
+  .lesson-card:not(.locked):hover{transform:translateY(-3px);border-color:var(--sun);}
+  .lesson-card .num{font-size:12px;font-weight:800;color:var(--cream-dim);letter-spacing:1.5px;}
+  .lesson-card .name{font-family:'Baloo 2';font-size:19px;font-weight:700;margin:2px 0 6px;line-height:1.15;}
+  .lesson-card .meta{font-size:13px;color:var(--cream-dim);font-weight:700;}
+  .stars{margin-top:8px;font-size:18px;letter-spacing:2px;color:#5a4a95;}
+  .stars .on{color:var(--sun);text-shadow:0 0 8px rgba(255,206,69,.7);}
+  .lesson-card.locked{opacity:.55;cursor:not-allowed;}
+  .lesson-card .lock{position:absolute;top:12px;right:14px;font-size:18px;}
+  .parents{margin-top:34px;background:var(--card);border-radius:var(--radius);padding:18px 20px;font-size:15px;color:var(--cream-dim);line-height:1.6;}
+  .parents b{color:var(--cream);}
+
+  /* ---------- GAME ---------- */
+  #game{display:none;flex-direction:column;height:100vh;height:100dvh;}
+  #game.active{display:flex;}
+  .game-top{display:flex;align-items:center;gap:12px;padding:12px 16px;}
+  .game-top .back{background:var(--card-hi);color:var(--cream);border-radius:14px;padding:8px 16px;font-size:16px;font-weight:700;box-shadow:0 3px 0 #170d3d;}
+  .game-top .lname{font-family:'Baloo 2';font-size:20px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hud{display:flex;gap:14px;align-items:center;font-weight:800;}
+  .hud .score{font-family:'Baloo 2';font-size:22px;color:var(--sun);min-width:64px;text-align:right;}
+  .hud .streak{font-size:15px;color:var(--cream-dim);}
+  .hud .streak.hot{color:#ff9a3e;}
+  #laneWrap{flex:1;position:relative;margin:0 auto;width:min(720px,100%);}
+  canvas#lanes{position:absolute;inset:0;width:100%;height:100%;}
+  #judge{
+    position:absolute;left:50%;top:52%;transform:translate(-50%,-50%) scale(.6);
+    font-family:'Baloo 2';font-size:44px;font-weight:800;opacity:0;pointer-events:none;
+    text-shadow:0 4px 0 rgba(0,0,0,.35);transition:none;
+  }
+  #judge.pop{animation:judgepop .5s ease forwards;}
+  @keyframes judgepop{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.5);}
+    25%{opacity:1;transform:translate(-50%,-50%) scale(1.15);}
+    60%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+    100%{opacity:0;transform:translate(-50%,-60%) scale(1);}
+  }
+  #countin{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    font-family:'Baloo 2';font-size:120px;font-weight:800;color:var(--cream);
+    text-shadow:0 8px 0 rgba(0,0,0,.35);z-index:5;
+  }
+  .pads{display:flex;justify-content:center;gap:14px;padding:10px 12px calc(18px + env(safe-area-inset-bottom));}
+  .padbtn{
+    --pc:var(--sun);
+    width:104px;height:104px;border-radius:50%;position:relative;user-select:none;
+    background:radial-gradient(circle at 35% 28%, #ffffff33, transparent 45%),
+               radial-gradient(circle at 50% 55%, var(--pc), color-mix(in srgb,var(--pc) 55%, #000));
+    box-shadow:0 7px 0 color-mix(in srgb,var(--pc) 40%, #000), 0 14px 24px rgba(0,0,0,.45);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    color:#1a0f33;font-weight:800;transition:transform .05s ease;
+    border:3px solid rgba(255,255,255,.25);
+  }
+  .padbtn .pname{font-family:'Baloo 2';font-size:15px;line-height:1;}
+  .padbtn .key{font-size:12px;background:rgba(0,0,0,.28);color:#fff;padding:2px 9px;border-radius:8px;letter-spacing:1px;}
+  .padbtn.hit{transform:scale(.9) translateY(4px);box-shadow:0 2px 0 color-mix(in srgb,var(--pc) 40%, #000);}
+  @media (max-width:620px){.padbtn{width:74px;height:74px;}.padbtn .pname{font-size:12px;}}
+
+  /* ---------- RESULTS ---------- */
+  #results{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(11,6,32,.85);backdrop-filter:blur(6px);z-index:20;padding:20px;
+  }
+  #results.active{display:flex;}
+  .res-card{
+    background:var(--card);border-radius:28px;padding:34px 34px 28px;text-align:center;
+    max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6);border:3px solid var(--card-hi);
+    animation:resin .35s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes resin{from{transform:scale(.7);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .res-card h2{margin:0 0 4px;font-size:34px;}
+  .res-sub{color:var(--cream-dim);font-weight:700;margin-bottom:14px;}
+  .big-stars{font-size:52px;letter-spacing:6px;color:#4a3a85;margin:6px 0 10px;}
+  .big-stars .on{color:var(--sun);text-shadow:0 0 18px rgba(255,206,69,.8);
+    display:inline-block;animation:starpop .4s cubic-bezier(.2,1.6,.4,1) backwards;}
+  .big-stars .on:nth-child(2){animation-delay:.18s}.big-stars .on:nth-child(3){animation-delay:.36s}
+  @keyframes starpop{from{transform:scale(0) rotate(-40deg);}to{transform:scale(1) rotate(0);}}
+  .res-score{font-family:'Baloo 2';font-size:46px;font-weight:800;color:var(--cream);}
+  .res-detail{display:flex;justify-content:center;gap:18px;margin:8px 0 20px;font-weight:800;font-size:15px;}
+  .res-detail .p{color:var(--good)}.res-detail .g{color:var(--sun)}.res-detail .m{color:var(--kick)}
+  .res-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001s !important;transition-duration:.001s !important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<div class="screen active" id="home">
+  <div class="home-wrap">
+    <div class="logo-row"><div class="logo-badge">🥁</div><h1 class="title">Drum Star</h1></div>
+    <p class="tagline">Hit the falling gems right on the beat and become a drum star!</p>
+    <div class="top-actions">
+      <button class="btn" id="btnContinue">▶ Play next lesson</button>
+      <button class="btn ghost" id="btnFreeplay">🎶 Free play</button>
+      <button class="btn ghost" id="btnPractice">🐢 Practice mode: <span id="practiceState">OFF</span></button>
+      <button class="btn ghost" id="btnSound">🔊 Sound check</button>
+    </div>
+    <p id="sndHint" style="text-align:center;color:var(--sun);font-weight:800;margin:-14px 0 24px;">
+      👆 Tap “Sound check” first — browsers keep sound off until you tap!
+    </p>
+    <div id="stageList"></div>
+    <div class="parents">
+      <b>For grown-ups:</b> Lessons unlock one at a time, just like Melodics. Earn at least ★ to open the next one.
+      Play by tapping the pads or with keyboard keys <b>D&nbsp;F&nbsp;J&nbsp;K&nbsp;L</b> (left hand on D–F, right hand on J–K–L).
+      <b>Practice mode</b> slows every lesson down — great for the first try. Progress is saved automatically.
+      <br><b>No sound?</b> Tap “Sound check” once (browsers block audio until the first tap). On an iPhone or iPad,
+      also flip the side <b>mute switch off</b> and turn the volume up — Web Audio follows the ringer switch.
+      <br><b>iPad tip:</b> in Safari tap <b>Share → Add to Home Screen</b> to install Drum Star as a full-screen app.
+    </div>
+  </div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div class="screen" id="game">
+  <div class="game-top">
+    <button class="back" id="btnBack">← Back</button>
+    <div class="lname" id="lessonName"></div>
+    <div class="hud">
+      <div class="streak" id="streak"></div>
+      <div class="score" id="score">0%</div>
+    </div>
+  </div>
+  <div id="laneWrap">
+    <canvas id="lanes"></canvas>
+    <div id="judge"></div>
+    <div id="countin"></div>
+  </div>
+  <div class="pads" id="padRow"></div>
+</div>
+
+<!-- ============ RESULTS ============ -->
+<div id="results">
+  <div class="res-card">
+    <h2 id="resTitle">Amazing!</h2>
+    <div class="res-sub" id="resLesson"></div>
+    <div class="big-stars" id="resStars"></div>
+    <div class="res-score" id="resScore"></div>
+    <div class="res-detail">
+      <span class="p" id="resPerfect"></span><span class="g" id="resGood"></span><span class="m" id="resMiss"></span>
+    </div>
+    <div class="res-btns">
+      <button class="btn ghost" id="resRetry">↺ Try again</button>
+      <button class="btn" id="resNext">Next lesson →</button>
+      <button class="btn ghost" id="resHome">🏠 Home</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =============== DRUM SOUNDS (Web Audio) =============== */
+let AC = null, audioReady = false;
+function audio(){ if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+/* Browsers block audio until a user gesture. Unlock on the very first
+   tap/click/keypress: play a silent buffer (wakes iOS Safari) + resume(). */
+function unlockAudio(){
+  if(audioReady && AC && AC.state==='running') return;
+  try{
+    const c = audio();
+    const b = c.createBuffer(1, 1, 22050);
+    const s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0);
+    c.resume().then(()=>{ audioReady = true; const el=document.getElementById('sndHint'); if(el) el.style.display='none'; });
+  }catch(e){}
+}
+['pointerdown','touchend','keydown','mousedown','click'].forEach(ev=>
+  document.addEventListener(ev, unlockAudio, {capture:true}));
+function noiseBuffer(ctx,len=0.4){
+  const b = ctx.createBuffer(1, ctx.sampleRate*len, ctx.sampleRate);
+  const d = b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  return b;
+}
+let _noise=null;
+function playKick(){const c=audio();const t=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(45,t+.12);
+  g.gain.setValueAtTime(1,t);g.gain.exponentialRampToValueAtTime(.001,t+.32);
+  o.connect(g).connect(c.destination);o.start(t);o.stop(t+.35);}
+function playSnare(){const c=audio();const t=c.currentTime;_noise=_noise||noiseBuffer(c);
+  const n=c.createBufferSource();n.buffer=_noise;
+  const f=c.createBiquadFilter();f.type='highpass';f.frequency.value=1400;
+  const g=c.createGain();g.gain.setValueAtTime(.8,t);g.gain.exponentialRampToValueAtTime(.001,t+.18);
+  n.connect(f).connect(g).connect(c.destination);n.start(t);n.stop(t+.2);
+  const o=c.createOscillator(),og=c.createGain();o.frequency.value=190;
+  og.gain.setValueAtTime(.5,t);og.gain.exponentialRampToValueAtTime(.001,t+.12);
+  o.connect(og).connect(c.destination);o.start(t);o.stop(t+.13);}
+function playHihat(){const c=audio();const t=c.currentTime;_noise=_noise||noiseBuffer(c);
+  const n=c.createBufferSource();n.buffer=_noise;
+  const f=c.createBiquadFilter();f.type='highpass';f.frequency.value=7000;
+  const g=c.createGain();g.gain.setValueAtTime(.45,t);g.gain.exponentialRampToValueAtTime(.001,t+.06);
+  n.connect(f).connect(g).connect(c.destination);n.start(t);n.stop(t+.08);}
+function playTom(){const c=audio();const t=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.frequency.setValueAtTime(200,t);o.frequency.exponentialRampToValueAtTime(95,t+.2);
+  g.gain.setValueAtTime(.9,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);
+  o.connect(g).connect(c.destination);o.start(t);o.stop(t+.32);}
+function playCrash(){const c=audio();const t=c.currentTime;_noise=_noise||noiseBuffer(c);
+  const n=c.createBufferSource();n.buffer=_noise;n.loop=true;
+  const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=6000;f.Q.value=.4;
+  const g=c.createGain();g.gain.setValueAtTime(.6,t);g.gain.exponentialRampToValueAtTime(.001,t+1.1);
+  n.connect(f).connect(g).connect(c.destination);n.start(t);n.stop(t+1.15);}
+function playClick(accent){const c=audio();const t=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();o.frequency.value=accent?1500:1000;
+  g.gain.setValueAtTime(accent?.5:.3,t);g.gain.exponentialRampToValueAtTime(.001,t+.05);
+  o.connect(g).connect(c.destination);o.start(t);o.stop(t+.06);}
+
+/* =============== PADS =============== */
+const PADS = {
+  hihat:{name:'Hi-Hat', key:'D', color:'#3EE0D3', play:playHihat},
+  snare:{name:'Snare',  key:'F', color:'#FFCE45', play:playSnare},
+  kick: {name:'Kick',   key:'J', color:'#FF5D73', play:playKick},
+  tom:  {name:'Tom',    key:'K', color:'#A98BFF', play:playTom},
+  crash:{name:'Crash',  key:'L', color:'#FF9A3E', play:playCrash},
+};
+const KEYMAP = {d:'hihat', f:'snare', j:'kick', k:'tom', l:'crash'};
+
+/* =============== CURRICULUM =============== */
+// n(beat, pad) — beat counted from 0, quarter-note = 1
+const n=(b,p)=>({b,p});
+const bar=(arr,offset)=>arr.map(x=>n(x.b+offset,x.p));
+function repeatBars(pattern, bars){let out=[];for(let i=0;i<bars;i++)out=out.concat(bar(pattern,i*4));return out;}
+
+const rockQuarter = [n(0,'hihat'),n(0,'kick'),n(1,'hihat'),n(1,'snare'),n(2,'hihat'),n(2,'kick'),n(3,'hihat'),n(3,'snare')];
+const rockEighth = [n(0,'hihat'),n(0,'kick'),n(.5,'hihat'),n(1,'hihat'),n(1,'snare'),n(1.5,'hihat'),
+                    n(2,'hihat'),n(2,'kick'),n(2.5,'hihat'),n(3,'hihat'),n(3,'snare'),n(3.5,'hihat')];
+const funkKick = [n(0,'hihat'),n(0,'kick'),n(.5,'hihat'),n(1,'hihat'),n(1,'snare'),n(1.5,'hihat'),
+                  n(2,'hihat'),n(2.5,'hihat'),n(2.5,'kick'),n(3,'hihat'),n(3,'snare'),n(3.5,'hihat')];
+const fillBar = [n(0,'snare'),n(.5,'snare'),n(1,'tom'),n(1.5,'tom'),n(2,'snare'),n(2.5,'snare'),n(3,'tom'),n(3.5,'tom')];
+
+const STAGES = [
+  {name:'First Beats', lvl:'BEGINNER', lessons:[
+    {id:'l1', name:'Meet the Kick', bpm:60, pads:['kick'],
+      notes:repeatBars([n(0,'kick'),n(1,'kick'),n(2,'kick'),n(3,'kick')],2)},
+    {id:'l2', name:'Snare Says Hi', bpm:60, pads:['snare'],
+      notes:repeatBars([n(0,'snare'),n(1,'snare'),n(2,'snare'),n(3,'snare')],2)},
+    {id:'l3', name:'Tick-Tock Hi-Hat', bpm:70, pads:['hihat'],
+      notes:repeatBars([n(0,'hihat'),n(1,'hihat'),n(2,'hihat'),n(3,'hihat')],2)},
+    {id:'l4', name:'Kick + Snare Team', bpm:65, pads:['snare','kick'],
+      notes:repeatBars([n(0,'kick'),n(1,'snare'),n(2,'kick'),n(3,'snare')],2)},
+  ]},
+  {name:'Groove Builder', lvl:'BEGINNER +', lessons:[
+    {id:'l5', name:'Hi-Hat Train', bpm:70, pads:['hihat'],
+      notes:repeatBars([n(0,'hihat'),n(.5,'hihat'),n(1,'hihat'),n(1.5,'hihat'),n(2,'hihat'),n(2.5,'hihat'),n(3,'hihat'),n(3.5,'hihat')],2)},
+    {id:'l6', name:'My First Rock Beat', bpm:75, pads:['hihat','snare','kick'],
+      notes:repeatBars(rockQuarter,2)},
+    {id:'l7', name:'Rock Beat Level 2', bpm:75, pads:['hihat','snare','kick'],
+      notes:repeatBars(rockEighth,2)},
+    {id:'l8', name:'Tom-Tom Time', bpm:80, pads:['snare','tom'],
+      notes:repeatBars([n(0,'snare'),n(1,'snare'),n(2,'tom'),n(3,'tom')],2)},
+  ]},
+  {name:'Rhythm Explorer', lvl:'INTERMEDIATE', lessons:[
+    {id:'l9', name:'Sneaky Kick', bpm:85, pads:['hihat','snare','kick'],
+      notes:repeatBars(funkKick,2)},
+    {id:'l10', name:'First Drum Fill', bpm:85, pads:['snare','tom','crash'],
+      notes:[...fillBar, n(4,'crash')]},
+    {id:'l11', name:'Groove + Fill', bpm:90, pads:['hihat','snare','kick','tom','crash'],
+      notes:[...rockQuarter, ...bar(fillBar,4), n(8,'crash'), n(8,'kick')]},
+    {id:'l12', name:'Faster Rock', bpm:100, pads:['hihat','snare','kick'],
+      notes:repeatBars(rockEighth,2)},
+  ]},
+  {name:'Drum Star', lvl:'ADVANCED', lessons:[
+    {id:'l13', name:'Sixteenth Sprint', bpm:95, pads:['snare'],
+      notes:[0,.25,.5,.75,1,1.25,1.5,1.75,2,2.25,2.5,2.75,3,3.5].map(b=>n(b,'snare'))},
+    {id:'l14', name:'Funky Groove', bpm:105, pads:['hihat','snare','kick'],
+      notes:repeatBars(funkKick,3)},
+    {id:'l15', name:'Grand Finale', bpm:115, pads:['hihat','snare','kick','tom','crash'],
+      notes:[...rockEighth, ...bar(rockEighth,4), ...bar(fillBar,8), n(12,'crash'), n(12,'kick')]},
+  ]},
+];
+const ALL_LESSONS = STAGES.flatMap(s=>s.lessons);
+
+/* =============== PROGRESS (saved on this device) =============== */
+let progress = {}; // {lessonId:{stars,best}}
+async function loadProgress(){
+  try{
+    const r = localStorage.getItem('drumstar-progress');
+    if(r) progress = JSON.parse(r);
+  }catch(e){ /* private browsing — progress lasts for this session only */ }
+}
+async function saveProgress(){
+  try{ localStorage.setItem('drumstar-progress', JSON.stringify(progress)); }
+  catch(e){}
+}
+function isUnlocked(idx){
+  if(idx===0) return true;
+  const prev = ALL_LESSONS[idx-1];
+  return (progress[prev.id]?.stars||0) >= 1;
+}
+function nextLessonIndex(){
+  for(let i=0;i<ALL_LESSONS.length;i++){
+    if((progress[ALL_LESSONS[i].id]?.stars||0)===0 && isUnlocked(i)) return i;
+  }
+  return ALL_LESSONS.length-1;
+}
+
+/* =============== HOME RENDER =============== */
+let practiceMode = false;
+const $ = s=>document.querySelector(s);
+function renderHome(){
+  const wrap = $('#stageList'); wrap.innerHTML='';
+  let idx=0;
+  STAGES.forEach(stage=>{
+    const s=document.createElement('div'); s.className='stage';
+    s.innerHTML=`<div class="stage-head"><h2>${stage.name}</h2><span class="lvl">${stage.lvl}</span></div>`;
+    const grid=document.createElement('div'); grid.className='lessons';
+    stage.lessons.forEach(les=>{
+      const i = idx++;
+      const unlocked = isUnlocked(i);
+      const stars = progress[les.id]?.stars||0;
+      const card=document.createElement('button');
+      card.className='lesson-card'+(unlocked?'':' locked');
+      card.innerHTML=`
+        <div class="num">LESSON ${i+1}</div>
+        <div class="name">${les.name}</div>
+        <div class="meta">${les.bpm} bpm · ${les.notes.length} hits</div>
+        <div class="stars">${[1,2,3].map(k=>`<span class="${k<=stars?'on':''}">★</span>`).join('')}</div>
+        ${unlocked?'':'<div class="lock">🔒</div>'}`;
+      if(unlocked) card.onclick=()=>startLesson(i);
+      else card.disabled=true;
+      grid.appendChild(card);
+    });
+    s.appendChild(grid); wrap.appendChild(s);
+  });
+  $('#practiceState').textContent = practiceMode?'ON':'OFF';
+}
+
+/* =============== GAME =============== */
+const canvas=$('#lanes'), ctx=canvas.getContext('2d');
+let G=null; // game state
+const TRAVEL=1.8;               // seconds a gem falls
+const WIN_PERFECT=.11, WIN_GOOD=.22; // seconds (generous for small hands)
+const HITLINE=.82;              // fraction of lane height
+
+function buildPads(padIds){
+  const row=$('#padRow'); row.innerHTML='';
+  padIds.forEach(id=>{
+    const p=PADS[id];
+    const b=document.createElement('button');
+    b.className='padbtn'; b.style.setProperty('--pc',p.color); b.dataset.pad=id;
+    b.innerHTML=`<span class="pname">${p.name}</span><span class="key">${p.key}</span>`;
+    const hit=(e)=>{e.preventDefault(); padHit(id);};
+    b.addEventListener('pointerdown',hit);
+    row.appendChild(b);
+  });
+}
+function flashPad(id){
+  const el=document.querySelector(`.padbtn[data-pad="${id}"]`);
+  if(!el)return; el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),90);
+}
+
+function startLesson(i){
+  const les=ALL_LESSONS[i];
+  const bpm=Math.round(les.bpm*(practiceMode?0.75:1));
+  const spb=60/bpm;
+  const lanePads=(les.pads.length? les.pads : ['kick']).slice();
+  // stable lane order: hihat, snare, kick, tom, crash
+  const order=['hihat','snare','kick','tom','crash'];
+  lanePads.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+  buildPads(lanePads);
+  const notes=les.notes.map(x=>({t:x.b*spb, pad:x.p, state:'wait', y:0})).sort((a,b)=>a.t-b.t);
+  const lastT=notes[notes.length-1].t;
+  const beats=Math.ceil((lastT+0.01)/spb)+1;
+
+  G={ idx:i, les, bpm, spb, lanePads, notes,
+      startAt:0, countBeats:4, endT:lastT+1.2,
+      perfect:0, good:0, miss:0, streak:0, maxStreak:0,
+      lastClickBeat:-1, particles:[], running:true, freeplay:false };
+
+  $('#lessonName').textContent = `${les.name}  ·  ${bpm} bpm${practiceMode?' 🐢':''}`;
+  $('#score').textContent='—'; $('#streak').textContent='';
+  showScreen('game'); resizeCanvas();
+  unlockAudio();
+  const c=audio();
+  Promise.resolve(c.resume()).catch(()=>{}).then(()=>{
+    G.startAt=c.currentTime + G.countBeats*spb + 0.2;
+    requestAnimationFrame(loop);
+  });
+}
+
+function startFreeplay(){
+  buildPads(['hihat','snare','kick','tom','crash']);
+  G={freeplay:true, running:true, particles:[], lanePads:['hihat','snare','kick','tom','crash']};
+  $('#lessonName').textContent='Free Play — jam on anything!';
+  $('#score').textContent='🎶'; $('#streak').textContent='';
+  showScreen('game'); resizeCanvas(); requestAnimationFrame(loop);
+}
+
+function padHit(id){
+  const p=PADS[id]; if(!p) return;
+  p.play(); flashPad(id);
+  if(!G || !G.running || G.freeplay){ if(G) burst(id, 1); return; }
+  const c=audio(); const t=c.currentTime - G.startAt;
+  // find nearest waiting note on this pad
+  let best=null, bestD=1e9;
+  for(const nt of G.notes){
+    if(nt.state!=='wait' || nt.pad!==id) continue;
+    const d=Math.abs(nt.t - t);
+    if(d<bestD){bestD=d;best=nt;}
+    if(nt.t - t > WIN_GOOD) break;
+  }
+  if(best && bestD<=WIN_GOOD){
+    best.state = bestD<=WIN_PERFECT ? 'perfect':'good';
+    if(best.state==='perfect'){G.perfect++; judge('PERFECT!','#7BE382'); burst(id,2);}
+    else {G.good++; judge('GOOD!','#FFCE45'); burst(id,1);}
+    G.streak++; G.maxStreak=Math.max(G.maxStreak,G.streak);
+    updateHUD();
+  }
+}
+function judge(txt,color){
+  const j=$('#judge'); j.textContent=txt; j.style.color=color;
+  j.classList.remove('pop'); void j.offsetWidth; j.classList.add('pop');
+}
+function updateHUD(){
+  const total=G.notes.length;
+  const pts=G.perfect*100+G.good*60;
+  const pct=Math.round(pts/(total*100)*100);
+  $('#score').textContent=pct+'%';
+  const st=$('#streak');
+  if(G.streak>=4){st.textContent='🔥 '+G.streak+' streak'; st.classList.add('hot');}
+  else if(G.streak>0){st.textContent=G.streak+' in a row'; st.classList.remove('hot');}
+  else {st.textContent=''; st.classList.remove('hot');}
+}
+
+/* --- particles --- */
+function laneX(padId){
+  const i=G.lanePads.indexOf(padId);
+  const w=canvas.clientWidth/G.lanePads.length;
+  return w*i+w/2;
+}
+function burst(padId,power){
+  if(!G.lanePads.includes(padId))return;
+  const x=laneX(padId), y=canvas.clientHeight*HITLINE;
+  const col=PADS[padId].color;
+  for(let k=0;k<10*power;k++){
+    G.particles.push({x,y,vx:(Math.random()-.5)*260,vy:-Math.random()*300-60,
+      life:.6,age:0,col,r:3+Math.random()*4});
+  }
+}
+
+/* --- render loop --- */
+function resizeCanvas(){
+  const dpr=window.devicePixelRatio||1;
+  const r=canvas.getBoundingClientRect();
+  canvas.width=r.width*dpr; canvas.height=r.height*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',()=>{ if($('#game').classList.contains('active')) resizeCanvas(); });
+
+let lastFrame=0;
+function loop(ts){
+  if(!G||!G.running)return;
+  const dt=Math.min(.05,(ts-lastFrame)/1000||0); lastFrame=ts;
+  const W=canvas.clientWidth,H=canvas.clientHeight;
+  ctx.clearRect(0,0,W,H);
+  const laneW=W/G.lanePads.length;
+  // lanes
+  G.lanePads.forEach((p,i)=>{
+    ctx.fillStyle=i%2?'rgba(255,255,255,.03)':'rgba(255,255,255,.055)';
+    ctx.fillRect(i*laneW,0,laneW,H);
+    ctx.fillStyle=PADS[p].color+'33';
+    ctx.fillRect(i*laneW+4,H*HITLINE-4,laneW-8,8);
+  });
+  // hit line
+  ctx.fillStyle='rgba(255,255,255,.85)';
+  ctx.fillRect(0,H*HITLINE-1.5,W,3);
+
+  if(!G.freeplay){
+    const c=audio(); const t=c.currentTime-G.startAt;
+    // count-in display + metronome
+    const ci=$('#countin');
+    if(t<0){
+      const beat=Math.floor((t+G.countBeats*G.spb)/G.spb);
+      ci.style.display='flex'; ci.textContent=Math.min(4,beat+1);
+      if(beat!==G.lastClickBeat){playClick(beat===0);G.lastClickBeat=beat;}
+    } else {
+      ci.style.display='none';
+      const beat=Math.floor(t/G.spb)+100; // offset so it never collides with count-in beats
+      if(beat!==G.lastClickBeat && t<G.endT-0.8){playClick(((beat-100)%4)===0);G.lastClickBeat=beat;}
+    }
+    // notes
+    for(const nt of G.notes){
+      if(nt.state==='wait' && t-nt.t>WIN_GOOD){nt.state='miss';G.miss++;G.streak=0;judge('MISS','#FF5D73');updateHUD();}
+      if(nt.state!=='wait')continue;
+      const y=H*HITLINE - (nt.t-t)/TRAVEL*H*HITLINE;
+      if(y<-30)continue;
+      const x=laneX(nt.pad), col=PADS[nt.pad].color;
+      const r=Math.min(laneW*.28,26);
+      ctx.beginPath();ctx.arc(x,y,r,0,7);
+      const grad=ctx.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r);
+      grad.addColorStop(0,'#ffffff');grad.addColorStop(.35,col);grad.addColorStop(1,shade(col,-.45));
+      ctx.fillStyle=grad;ctx.fill();
+      ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.5)';ctx.stroke();
+    }
+    if(t>G.endT){finishLesson();return;}
+  }
+  // particles
+  G.particles=G.particles.filter(p=>p.age<p.life);
+  for(const p of G.particles){
+    p.age+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=800*dt;
+    ctx.globalAlpha=1-p.age/p.life;
+    ctx.fillStyle=p.col;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  requestAnimationFrame(loop);
+}
+function shade(hex,amt){
+  const c=parseInt(hex.slice(1),16);
+  let r=(c>>16)&255,g=(c>>8)&255,b=c&255;
+  r=Math.max(0,Math.min(255,r+255*amt));g=Math.max(0,Math.min(255,g+255*amt));b=Math.max(0,Math.min(255,b+255*amt));
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+
+/* --- finish --- */
+async function finishLesson(){
+  G.running=false;
+  const total=G.notes.length;
+  const pct=Math.round((G.perfect*100+G.good*60)/(total*100)*100);
+  const stars=pct>=92?3:pct>=75?2:pct>=50?1:0;
+  const prev=progress[G.les.id]||{stars:0,best:0};
+  progress[G.les.id]={stars:Math.max(prev.stars,stars),best:Math.max(prev.best,pct)};
+  await saveProgress();
+
+  $('#resTitle').textContent = stars===3?'SUPERSTAR! 🌟':stars===2?'Awesome!':stars===1?'You did it!':'Almost there!';
+  $('#resLesson').textContent = G.les.name;
+  $('#resStars').innerHTML=[1,2,3].map(k=>`<span class="${k<=stars?'on':''}">★</span>`).join('');
+  $('#resScore').textContent=pct+'%';
+  $('#resPerfect').textContent=`Perfect ${G.perfect}`;
+  $('#resGood').textContent=`Good ${G.good}`;
+  $('#resMiss').textContent=`Miss ${G.miss}`;
+  const hasNext=G.idx<ALL_LESSONS.length-1 && stars>=1;
+  $('#resNext').style.display=hasNext?'':'none';
+  $('#results').classList.add('active');
+}
+
+/* =============== SCREENS + INPUT =============== */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $('#'+id).classList.add('active');
+  $('#results').classList.remove('active');
+  if(id==='home'){ if(G)G.running=false; G=null; renderHome(); }
+}
+document.addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const pad=KEYMAP[e.key.toLowerCase()];
+  if(pad && $('#game').classList.contains('active') && !$('#results').classList.contains('active')){
+    e.preventDefault(); padHit(pad);
+  }
+});
+$('#btnBack').onclick=()=>showScreen('home');
+$('#btnFreeplay').onclick=()=>{audio();startFreeplay();};
+$('#btnContinue').onclick=()=>{audio();startLesson(nextLessonIndex());};
+$('#btnPractice').onclick=()=>{practiceMode=!practiceMode;$('#practiceState').textContent=practiceMode?'ON':'OFF';};
+$('#btnSound').onclick=()=>{
+  unlockAudio();
+  const c=audio();
+  Promise.resolve(c.resume()).catch(()=>{}).then(()=>{
+    playKick(); setTimeout(playSnare,250); setTimeout(playHihat,500);
+    setTimeout(playHihat,650); setTimeout(playCrash,800); setTimeout(playKick,800);
+  });
+};
+$('#resRetry').onclick=()=>{$('#results').classList.remove('active');startLesson(G.idx);};
+$('#resNext').onclick=()=>{$('#results').classList.remove('active');startLesson(G.idx+1);};
+$('#resHome').onclick=()=>showScreen('home');
+
+loadProgress().then(renderHome);
+</script>
+</body>
+</html>
