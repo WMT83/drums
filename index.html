@@ -412,6 +412,7 @@ function audio(){
 /* Browsers block audio until a user gesture. Unlock on the very first
    tap/click/keypress: play a silent buffer (wakes iOS Safari) + resume(). */
 function unlockAudio(){
+  try{ requestPersist(); }catch(e){}   // ask to keep storage on first interaction (iOS grants it more readily then)
   if(audioReady && AC && AC.state==='running') return;
   try{
     const c = audio();
@@ -627,7 +628,7 @@ function loadPlayers(){
   if(!players || typeof players!=='object') players={active:null,list:[]};
   if(!Array.isArray(players.list)) players.list=[];
 }
-function savePlayers(){ try{ localStorage.setItem('drumstar-players', JSON.stringify(players)); }catch(e){} }
+function savePlayers(){ try{ localStorage.setItem('drumstar-players', JSON.stringify(players)); }catch(e){} backupToIDB(); }
 function activePlayer(){ return players.list.find(p=>p.id===players.active) || null; }
 function progKey(id){ return 'drumstar-progress-'+id; }
 function newId(){ return 'p'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36); }
@@ -662,6 +663,7 @@ function saveProgress(){
   const p=activePlayer(); if(!p) return;
   try{ localStorage.setItem(progKey(p.id), JSON.stringify(progress)); }
   catch(e){}
+  backupToIDB();
 }
 
 /* =============== DAILY PRACTICE STREAK (per active player) =============== */
@@ -676,7 +678,7 @@ function loadStreak(){
   return {last:'',current:0,best:0,days:[]};
 }
 function saveStreak(s){ const p=activePlayer(); if(!p) return;
-  try{ localStorage.setItem(streakKey(p.id), JSON.stringify(s)); }catch(e){} }
+  try{ localStorage.setItem(streakKey(p.id), JSON.stringify(s)); }catch(e){} backupToIDB(); }
 
 /* Daily practice goal: complete GOAL_TARGET lessons in a day. Stored alongside
    the streak record (gDay/gCount). */
@@ -1192,7 +1194,52 @@ $('#npCancel').onclick=()=>{ renderPlayers(); showScreen('players'); };
 $('#nameInput').addEventListener('input',e=>{ e.target.style.borderColor=''; });
 $('#nameInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); $('#npStart').click(); } });
 
-/* --- boot: pick a drummer before showing home --- */
+/* =============== DURABLE STORAGE (survive iOS clearing localStorage) ===============
+   localStorage stays the primary (synchronous) store; every save is also mirrored
+   into IndexedDB, which iOS is far less likely to evict — especially once we've
+   asked for persistent storage. On launch, if localStorage looks empty we restore
+   the last IndexedDB snapshot before showing the app, so progress comes back. */
+const IDB_NAME='drumstar', IDB_STORE='kv', IDB_KEY='snapshot';
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    try{
+      const r=indexedDB.open(IDB_NAME,1);
+      r.onupgradeneeded=()=>{ try{ r.result.createObjectStore(IDB_STORE); }catch(e){} };
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+    }catch(e){ rej(e); }
+  });
+}
+function idbReq(store,mode,fn){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const s=db.transaction(IDB_STORE,mode).objectStore(IDB_STORE);
+    const t=fn(s); t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error);
+  }));
+}
+function drumstarSnapshot(){
+  const o={};
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i);
+    if(k && k.indexOf('drumstar-')===0) o[k]=localStorage.getItem(k); } }catch(e){}
+  return o;
+}
+let _bkTimer=null;
+function backupToIDB(){
+  clearTimeout(_bkTimer);
+  _bkTimer=setTimeout(()=>{ idbReq(IDB_STORE,'readwrite',s=>s.put(drumstarSnapshot(),IDB_KEY)).catch(()=>{}); },400);
+}
+async function hydrateFromBackup(){
+  try{ if(localStorage.getItem('drumstar-players')) return; }catch(e){ return; }   // already have data
+  try{
+    const snap=await idbReq(IDB_STORE,'readonly',s=>s.get(IDB_KEY));
+    if(snap && typeof snap==='object'){
+      Object.keys(snap).forEach(k=>{ try{ if(localStorage.getItem(k)==null) localStorage.setItem(k,snap[k]); }catch(e){} });
+    }
+  }catch(e){}
+}
+function requestPersist(){ try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){} }
+// Flush a fresh snapshot as the app is backgrounded/closed (best effort).
+window.addEventListener('pagehide',()=>{ try{ idbReq(IDB_STORE,'readwrite',s=>s.put(drumstarSnapshot(),IDB_KEY)).catch(()=>{}); }catch(e){} });
+
+/* --- boot: restore any backup, ask to keep storage, then pick a drummer --- */
 function boot(){
   loadPlayers();
   if(players.list.length===0){ renderNewPlayer(true); showScreen('newplayer'); return; }
@@ -1200,7 +1247,8 @@ function boot(){
   loadProgress();
   showScreen('home');
 }
-boot();
+requestPersist();
+hydrateFromBackup().then(boot);
 </script>
 </body>
 </html>
