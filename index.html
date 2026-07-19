@@ -127,12 +127,16 @@
     font-family:'Baloo 2';font-size:120px;font-weight:800;color:var(--cream);
     text-shadow:0 8px 0 rgba(0,0,0,.35);z-index:5;
   }
-  .pads{display:flex;justify-content:center;gap:14px;
-    padding:10px calc(12px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom))
+  /* Pads arranged like a drum kit: cymbals + tom up top, snare + kick below. */
+  .pads{display:flex;flex-direction:column;align-items:center;gap:6px;
+    padding:8px calc(12px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom))
             calc(12px + env(safe-area-inset-left));}
+  .kit-row{display:flex;justify-content:center;align-items:flex-end;gap:16px;}
+  .kit-top{margin-bottom:-6px;z-index:1;}   /* cymbals/toms tuck slightly behind the front row */
+  .kit-bottom{z-index:2;}
   .padbtn{
     --pc:var(--sun);
-    width:104px;height:104px;border-radius:50%;position:relative;user-select:none;
+    width:100px;height:100px;border-radius:50%;position:relative;user-select:none;
     background:radial-gradient(circle at 35% 28%, #ffffff33, transparent 45%),
                radial-gradient(circle at 50% 55%, var(--pc), color-mix(in srgb,var(--pc) 55%, #000));
     box-shadow:0 7px 0 color-mix(in srgb,var(--pc) 40%, #000), 0 14px 24px rgba(0,0,0,.45);
@@ -140,10 +144,24 @@
     color:#1a0f33;font-weight:800;transition:transform .05s ease;
     border:3px solid rgba(255,255,255,.25);
   }
+  /* Kit-specific sizes/shapes — colours stay tied to the falling gems. */
+  .padbtn.pad-kick {width:150px;height:112px;}                  /* big bass drum */
+  .padbtn.pad-snare{width:108px;height:108px;}
+  .padbtn.pad-tom  {width:92px; height:92px;}
+  .padbtn.pad-hihat,.padbtn.pad-crash{width:120px;height:78px;} /* flatter = cymbal */
   .padbtn .pname{font-family:'Baloo 2';font-size:15px;line-height:1;}
   .padbtn .key{font-size:12px;background:rgba(0,0,0,.28);color:#fff;padding:2px 9px;border-radius:8px;letter-spacing:1px;}
   .padbtn.hit{transform:scale(.9) translateY(4px);box-shadow:0 2px 0 color-mix(in srgb,var(--pc) 40%, #000);}
-  @media (max-width:620px){.padbtn{width:74px;height:74px;}.padbtn .pname{font-size:12px;}}
+  @media (max-width:620px){
+    .kit-row{gap:10px;}
+    .padbtn{width:70px;height:70px;}
+    .padbtn.pad-kick {width:104px;height:78px;}
+    .padbtn.pad-snare{width:78px; height:78px;}
+    .padbtn.pad-tom  {width:66px; height:66px;}
+    .padbtn.pad-hihat,.padbtn.pad-crash{width:86px;height:58px;}
+    .padbtn .pname{font-size:12px;}
+    .padbtn .key{font-size:11px;padding:1px 7px;}
+  }
 
   /* ---------- PROFILES ---------- */
   .pf-wrap{max-width:760px;margin:0 auto;text-align:center;
@@ -806,17 +824,30 @@ const TRAVEL=1.8;               // seconds a gem falls
 const WIN_PERFECT=.11, WIN_GOOD=.22; // seconds (generous for small hands)
 const HITLINE=.82;              // fraction of lane height
 
+// Lay the pads out like a real kit: cymbals + rack tom on a raised back row,
+// snare + big kick on the front row. Only the lesson's pads appear; empty rows
+// are skipped. Positions are fixed per piece so muscle memory builds up.
+const KIT_TOP=['crash','hihat','tom'], KIT_BOTTOM=['snare','kick'];
 function buildPads(padIds){
   const row=$('#padRow'); row.innerHTML='';
-  padIds.forEach(id=>{
-    const p=PADS[id];
-    const b=document.createElement('button');
-    b.className='padbtn'; b.style.setProperty('--pc',p.color); b.dataset.pad=id;
-    b.innerHTML=`<span class="pname">${p.name}</span><span class="key">${p.key}</span>`;
-    const hit=(e)=>{e.preventDefault(); padHit(id);};
-    b.addEventListener('pointerdown',hit);
-    row.appendChild(b);
-  });
+  const present=new Set(padIds);
+  const addRow=(cls,ids)=>{
+    const list=ids.filter(id=>present.has(id));
+    if(!list.length) return;
+    const r=document.createElement('div'); r.className='kit-row '+cls;
+    list.forEach(id=>{
+      const p=PADS[id];
+      const b=document.createElement('button');
+      b.className='padbtn pad-'+id; b.style.setProperty('--pc',p.color); b.dataset.pad=id;
+      b.innerHTML=`<span class="pname">${p.name}</span><span class="key">${p.key}</span>`;
+      const hit=(e)=>{e.preventDefault(); padHit(id);};
+      b.addEventListener('pointerdown',hit);
+      r.appendChild(b);
+    });
+    row.appendChild(r);
+  };
+  addRow('kit-top',KIT_TOP);
+  addRow('kit-bottom',KIT_BOTTOM);
 }
 function flashPad(id){
   const el=document.querySelector(`.padbtn[data-pad="${id}"]`);
