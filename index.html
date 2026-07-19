@@ -105,6 +105,9 @@
   .game-top .back{background:var(--card-hi);color:var(--cream);border-radius:14px;padding:8px 16px;font-size:16px;font-weight:700;box-shadow:0 3px 0 #170d3d;}
   .game-top .lname{font-family:'Baloo 2';font-size:20px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .hud{display:flex;gap:14px;align-items:center;font-weight:800;}
+  .hud .round{font-size:14px;font-weight:800;color:var(--night);background:var(--cream);
+    padding:4px 12px;border-radius:999px;letter-spacing:.5px;white-space:nowrap;}
+  .hud .round:empty{display:none;}
   .hud .score{font-family:'Baloo 2';font-size:22px;color:var(--sun);min-width:64px;text-align:right;}
   .hud .streak{font-size:15px;color:var(--cream-dim);}
   .hud .streak.hot{color:#ff9a3e;}
@@ -232,6 +235,17 @@
   @media (max-width:520px){.streak-card{gap:11px;padding:12px 14px;}.streak-card .dot{width:13px;height:13px;}
     .streak-card .flame{font-size:32px;}.streak-card .flame .num{font-size:28px;}}
 
+  /* ---------- DAILY PRACTICE GOAL ---------- */
+  .goal-card{display:flex;align-items:center;justify-content:center;gap:12px;
+    background:var(--card);border-radius:var(--radius);padding:12px 20px;max-width:520px;
+    margin:-12px auto 26px;box-shadow:0 6px 0 rgba(0,0,0,.3);}
+  .goal-card .goal-emoji{font-size:26px;line-height:1;}
+  .goal-card .goal-txt{font-family:'Baloo 2';font-weight:700;font-size:16px;color:var(--cream);}
+  .goal-card.met .goal-txt{color:var(--sun);}
+  .goal-card .goal-pips{display:flex;gap:6px;margin-left:2px;}
+  .goal-card .pip{width:14px;height:14px;border-radius:50%;background:var(--card-hi);}
+  .goal-card .pip.on{background:var(--good);box-shadow:0 0 8px rgba(123,227,130,.6);}
+
   /* ---------- CELEBRATION TOAST ---------- */
   #celebrate{position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:center;
     pointer-events:none;z-index:40;opacity:0;padding:0 16px;}
@@ -284,6 +298,7 @@
     <div class="logo-row"><div class="logo-badge">🥁</div><h1 class="title">Drum Star</h1></div>
     <p class="tagline">Hit the falling gems right on the beat and become a drum star!</p>
     <div class="streak-card" id="streakCard"></div>
+    <div class="goal-card" id="goalCard"></div>
     <div class="top-actions">
       <button class="btn" id="btnContinue">▶ Play next lesson</button>
       <button class="btn ghost" id="btnFreeplay">🎶 Free play</button>
@@ -297,7 +312,9 @@
     <div class="parents">
       <b>For grown-ups:</b> Lessons unlock one at a time, just like Melodics. Earn at least ★ to open the next one.
       Play by tapping the pads or with keyboard keys <b>D&nbsp;F&nbsp;J&nbsp;K&nbsp;L</b> (left hand on D–F, right hand on J–K–L).
-      <b>Practice mode</b> slows every lesson down — great for the first try. Progress is saved automatically.
+      Every lesson is a few <b>rounds</b> of the same groove that <b>speed up</b> as you go — slow first, then full
+      tempo — so it's real practice, not one quick pass. Aim for the <b>daily goal</b> of 3 songs to keep the flame lit.
+      <b>Practice mode</b> starts even slower and stays gentle — great for the first try. Progress is saved automatically.
       Each drummer has their <b>own name, avatar and stars</b> — tap <b>Switch</b> at the top to change players or add a sibling.
       <br><b>No sound?</b> Tap “Sound check” once (browsers block audio until the first tap) and turn the volume up.
       Drum Star now plays even with the iPad’s side <b>mute switch on</b>; on much older iPads, flip that switch off too.
@@ -337,6 +354,7 @@
     <button class="back" id="btnBack">← Back</button>
     <div class="lname" id="lessonName"></div>
     <div class="hud">
+      <div class="round" id="roundInd"></div>
       <div class="streak" id="streak"></div>
       <div class="score" id="score">0%</div>
     </div>
@@ -659,6 +677,31 @@ function loadStreak(){
 }
 function saveStreak(s){ const p=activePlayer(); if(!p) return;
   try{ localStorage.setItem(streakKey(p.id), JSON.stringify(s)); }catch(e){} }
+
+/* Daily practice goal: complete GOAL_TARGET lessons in a day. Stored alongside
+   the streak record (gDay/gCount). */
+const GOAL_TARGET=3;
+function bumpGoal(){
+  const p=activePlayer(); if(!p) return false;
+  const s=loadStreak(), today=todayStr();
+  if(s.gDay!==today){ s.gDay=today; s.gCount=0; }
+  s.gCount=(s.gCount||0)+1;
+  saveStreak(s);
+  return s.gCount===GOAL_TARGET;   // true only on the exact completion that hits the goal
+}
+function goalToday(){
+  const s=loadStreak();
+  return (s.gDay===todayStr()) ? (s.gCount||0) : 0;
+}
+function renderGoal(){
+  const el=$('#goalCard'); if(!el) return;
+  const done=goalToday(), met=done>=GOAL_TARGET;
+  el.classList.toggle('met', met);
+  const pips=Array.from({length:GOAL_TARGET},(_,i)=>`<span class="pip${i<done?' on':''}"></span>`).join('');
+  el.innerHTML=`<span class="goal-emoji">${met?'🎉':'🥁'}</span>`+
+    `<span class="goal-txt">${met?'Daily goal done — great practice!':`Today's practice: ${Math.min(done,GOAL_TARGET)}/${GOAL_TARGET} songs`}</span>`+
+    `<span class="goal-pips">${pips}</span>`;
+}
 // Records "played today". Returns a milestone number (3/7/14) if one was
 // newly reached today, else 0. Only counts once per calendar day.
 function markPracticeToday(){
@@ -748,6 +791,7 @@ function renderPlayerBar(){
 function renderHome(){
   renderPlayerBar();
   renderStreak();
+  renderGoal();
   const wrap = $('#stageList'); wrap.innerHTML='';
   let idx=0;
   STAGES.forEach(stage=>{
@@ -767,7 +811,7 @@ function renderHome(){
       card.innerHTML=`
         <div class="num">LESSON ${i+1}</div>
         <div class="name">${les.name}</div>
-        <div class="meta">${les.bpm} bpm · ${les.notes.length} hits</div>
+        <div class="meta">${les.bpm} bpm · ${roundCount(les)} rounds</div>
         <div class="stars">${[1,2,3].map(k=>`<span class="${k<=stars?'on':''}">★</span>`).join('')}</div>
         ${corner}`;
       if(unlocked) card.onclick=()=>startLesson(i);
@@ -854,42 +898,91 @@ function flashPad(id){
   if(!el)return; el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),90);
 }
 
+// A lesson is played as several back-to-back ROUNDS of the same groove, from
+// slow to full tempo — so one lesson is real repetition, not a single pass.
+// Songs (already long) get fewer rounds. Practice mode starts slower and tops
+// out below full speed.
+const ROUND_FRACS = { perform:[0.8,0.9,1.0], practice:[0.6,0.75,0.9] };
+const ROUND_FRACS_SONG = { perform:[0.85,1.0], practice:[0.7,0.85] };
+function roundCount(les){ return (les.backing?ROUND_FRACS_SONG:ROUND_FRACS).perform.length; }
+function lessonRounds(les){
+  const set = les.backing?ROUND_FRACS_SONG:ROUND_FRACS;
+  const fracs = practiceMode?set.practice:set.perform;
+  return fracs.map(f=>Math.max(40, Math.round(les.bpm*f)));
+}
+
+let SESSION=0;   // bumped each lesson start; guards stale timers/promises after navigation
 function startLesson(i){
   const les=ALL_LESSONS[i];
-  const bpm=Math.round(les.bpm*(practiceMode?0.75:1));
-  const spb=60/bpm;
   const lanePads=(les.pads.length? les.pads : ['kick']).slice();
-  // stable lane order: hihat, snare, kick, tom, crash
-  const order=['hihat','snare','kick','tom','crash'];
+  const order=['hihat','snare','kick','tom','crash'];   // stable lane order
   lanePads.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
   buildPads(lanePads);
-  const notes=les.notes.map(x=>({t:x.b*spb, pad:x.p, state:'wait', y:0})).sort((a,b)=>a.t-b.t);
-  const lastT=notes[notes.length-1].t;
-  const beats=Math.ceil((lastT+0.01)/spb)+1;
-
-  G={ idx:i, les, bpm, spb, lanePads, notes,
-      startAt:0, countBeats:4, endT:lastT+1.2, hasBacking:!!les.backing,
-      perfect:0, good:0, miss:0, streak:0, maxStreak:0,
-      lastClickBeat:-1, particles:[], running:true, freeplay:false };
-
-  $('#lessonName').textContent = `${les.name}  ·  ${bpm} bpm${practiceMode?' 🐢':''}`;
-  $('#score').textContent='—'; $('#streak').textContent='';
+  const rounds=lessonRounds(les);
+  SESSION++;
+  G={ idx:i, les, lanePads, rounds, roundIdx:0, session:SESSION,
+      sPerfect:0, sGood:0, sMiss:0, sNotes:les.notes.length*rounds.length,
+      hasBacking:!!les.backing, particles:[], running:true, freeplay:false };
+  $('#score').textContent='—'; $('#streak').textContent=''; $('#roundInd').textContent='';
   showScreen('game'); resizeCanvas();
   unlockAudio();
-  noteToday();
+  noteToday();                 // marks the daily streak once per session
+  startRound();
+}
+
+// Set up and start one round at the current round's tempo.
+function startRound(){
+  if(!G) return;
+  const les=G.les, my=G.session;
+  const bpm=G.rounds[G.roundIdx], spb=60/bpm;
+  const notes=les.notes.map(x=>({t:x.b*spb, pad:x.p, state:'wait'})).sort((a,b)=>a.t-b.t);
+  const lastT=notes[notes.length-1].t;
+  G.bpm=bpm; G.spb=spb; G.notes=notes;
+  G.countBeats = G.roundIdx===0?4:2;   // shorter count-in on later rounds keeps it flowing
+  G.endT=lastT+1.2;
+  G.perfect=0; G.good=0; G.miss=0; G.streak=0; G.lastClickBeat=-1; G.startAt=0;
+  G.running=true;
+  const total=G.rounds.length;
+  $('#lessonName').textContent = `${les.name}  ·  Round ${G.roundIdx+1}/${total}  ·  ${bpm} bpm${practiceMode?' 🐢':''}`;
+  updateHUD();
+  stopBacking();
   const c=audio();
   Promise.resolve(c.resume()).catch(()=>{}).then(()=>{
+    if(!G || G.session!==my || !G.running) return;   // navigated away meanwhile
     G.startAt=c.currentTime + G.countBeats*spb + 0.2;
     scheduleBacking(G);
     requestAnimationFrame(loop);
   });
 }
 
+// End of a round: bank the score, then either advance (with a quick "faster!"
+// banner) or finish the whole session.
+function endRound(){
+  if(!G) return;
+  G.running=false; stopBacking();
+  G.sPerfect+=G.perfect; G.sGood+=G.good; G.sMiss+=G.miss;
+  if(G.roundIdx < G.rounds.length-1){
+    G.roundIdx++;
+    const my=G.session;
+    showRoundBanner(G.roundIdx+1, G.rounds.length);
+    setTimeout(()=>{ if(G && G.session===my) startRound(); }, 1500);
+  } else {
+    finishSession();
+  }
+}
+function showRoundBanner(roundNum,total){
+  const ci=$('#countin'); ci.style.display='flex';
+  ci.innerHTML=`<div style="text-align:center;line-height:1.05">`+
+    `<div style="font-size:.34em;color:var(--cream-dim)">ROUND ${roundNum} / ${total}</div>`+
+    `<div style="color:var(--sun)">Faster! ⚡</div></div>`;
+  try{ playClick(true); }catch(e){}
+}
+
 function startFreeplay(){
   buildPads(['hihat','snare','kick','tom','crash']);
   G={freeplay:true, running:true, particles:[], lanePads:['hihat','snare','kick','tom','crash']};
   $('#lessonName').textContent='Free Play — jam on anything!';
-  $('#score').textContent='🎶'; $('#streak').textContent='';
+  $('#score').textContent='🎶'; $('#streak').textContent=''; $('#roundInd').textContent='';
   showScreen('game'); resizeCanvas(); noteToday(); requestAnimationFrame(loop);
 }
 
@@ -921,8 +1014,10 @@ function judge(txt,color){
 function updateHUD(){
   const total=G.notes.length;
   const pts=G.perfect*100+G.good*60;
-  const pct=Math.round(pts/(total*100)*100);
+  const pct=total?Math.round(pts/(total*100)*100):0;   // live accuracy for the current round
   $('#score').textContent=pct+'%';
+  const ri=$('#roundInd');
+  if(ri && G.rounds) ri.textContent=`Round ${(G.roundIdx||0)+1}/${G.rounds.length}`;
   const st=$('#streak');
   if(G.streak>=4){st.textContent='🔥 '+G.streak+' streak'; st.classList.add('hot');}
   else if(G.streak>0){st.textContent=G.streak+' in a row'; st.classList.remove('hot');}
@@ -1004,7 +1099,7 @@ function loop(ts){
       ctx.fillStyle=grad;ctx.fill();
       ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.5)';ctx.stroke();
     }
-    if(t>G.endT){finishLesson();return;}
+    if(t>G.endT){endRound();return;}
   }
   // particles
   G.particles=G.particles.filter(p=>p.age<p.life);
@@ -1024,32 +1119,35 @@ function shade(hex,amt){
   return `rgb(${r|0},${g|0},${b|0})`;
 }
 
-/* --- finish --- */
-async function finishLesson(){
-  G.running=false;
-  const total=G.notes.length;
-  const pct=Math.round((G.perfect*100+G.good*60)/(total*100)*100);
+/* --- finish the whole multi-round session --- */
+async function finishSession(){
+  G.running=false; stopBacking();
+  const totalNotes=G.sNotes||1;
+  const pct=Math.round((G.sPerfect*100+G.sGood*60)/(totalNotes*100)*100);   // averaged over all rounds
   const stars=pct>=92?3:pct>=75?2:pct>=50?1:0;
   const prev=progress[G.les.id]||{stars:0,best:0};
   progress[G.les.id]={stars:Math.max(prev.stars,stars),best:Math.max(prev.best,pct)};
   await saveProgress();
 
+  const goalJustHit=bumpGoal();                      // count this lesson toward today's goal
   // Did this result just 3-star the whole stage for the first time?
   const stage=stageOf(G.les.id);
-  if(stage && stageAllThree(stage) && !stageAllThree(stage, G.les.id, prev.stars)){
-    setTimeout(()=>showCelebration('🏆','Stage Complete!',`You 3-starred every lesson in ${stage.name}!`), 900);
-  }
+  const stageJustDone = stage && stageAllThree(stage) && !stageAllThree(stage, G.les.id, prev.stars);
 
   $('#resTitle').textContent = stars===3?'SUPERSTAR! 🌟':stars===2?'Awesome!':stars===1?'You did it!':'Almost there!';
-  $('#resLesson').textContent = G.les.name;
+  $('#resLesson').textContent = `${G.les.name} · ${G.rounds.length} rounds`;
   $('#resStars').innerHTML=[1,2,3].map(k=>`<span class="${k<=stars?'on':''}">★</span>`).join('');
   $('#resScore').textContent=pct+'%';
-  $('#resPerfect').textContent=`Perfect ${G.perfect}`;
-  $('#resGood').textContent=`Good ${G.good}`;
-  $('#resMiss').textContent=`Miss ${G.miss}`;
+  $('#resPerfect').textContent=`Perfect ${G.sPerfect}`;
+  $('#resGood').textContent=`Good ${G.sGood}`;
+  $('#resMiss').textContent=`Miss ${G.sMiss}`;
   const hasNext=G.idx<ALL_LESSONS.length-1 && stars>=1;
   $('#resNext').style.display=hasNext?'':'none';
   $('#results').classList.add('active');
+
+  // Celebrate the biggest thing that just happened (stage > daily goal).
+  if(stageJustDone) setTimeout(()=>showCelebration('🏆','Stage Complete!',`You 3-starred every lesson in ${stage.name}!`), 900);
+  else if(goalJustHit) setTimeout(()=>showCelebration('🎉','Daily Goal Done!',`You practiced ${GOAL_TARGET} songs today!`), 900);
 }
 
 /* =============== SCREENS + INPUT =============== */
